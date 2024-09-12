@@ -7,12 +7,13 @@ import requests
 
 dir_path = os.getcwd().replace('\\', '/')
 
-games = pd.concat([pd.read_csv(dir_path + '/data/steam_games_cleaned_1.csv'),
-                   pd.read_csv(dir_path + '/data/steam_games_cleaned_2.csv'),
-                   pd.read_csv(dir_path + '/data/steam_games_cleaned_3.csv')], axis=0).set_index('appid')
+games = pd.concat([pd.read_csv(dir_path + '/data/steam_games_cleaned1.csv'),
+                   pd.read_csv(dir_path + '/data/steam_games_cleaned2.csv'),
+                   pd.read_csv(dir_path + '/data/steam_games_cleaned3.csv')], axis=0).set_index('appid')
+#reviews = pd.read_csv(dir_path + '/data/reviews.csv').set_index('appid')
 search_keys = pd.read_csv(dir_path + '/data/search_keys.csv').set_index('name')
 closest_games = pd.read_csv(dir_path + '/data/top100_simils.csv').set_index('Unnamed: 0')
-output_columns = ['name', 'developer', 'genre', 'tags', 'languages', 'pos_rating_pct', 'owners', 'price']
+output_columns = ['name', 'developer', 'genre', 'tags', 'languages', 'pos_rating_pct', 'owners', 'price', 'review']
 
 filter_explicit = True
 explicit_genres = ['genre_Nudity', 'genre_Sexual Content']
@@ -34,6 +35,7 @@ def generate_results_table(search_title, game_filts=[], search_range=20):
     st.title(f'Hasil Rekomendasi game yang serupa dengan {search_title}')
     results = get_games(search_title.lower())
     results_df = games.loc[results]
+    #reviews_df = reviews.loc[results]
 
     if filter_explicit:
         for expl_filt in (explicit_genres + explicit_tags):
@@ -47,13 +49,16 @@ def generate_results_table(search_title, game_filts=[], search_range=20):
         f'<a href = https://store.steampowered.com/app/{results[y]}>{games.loc[results[y], "name"]}</a>' for y in
         range(len(results_df))]
     results_df['price'] = [f'${price}' for price in results_df['price']]
+    #reviews_df['review'] = [f'{review}' for review in reviews_df['review']]
+    results_df['review'] = [f'{review}' for review in results_df['review']]
     results_df['pos_rating_pct'] = (results_df['pos_rating_pct'] * 100).astype('int32')
     results_df = results_df.loc[:, output_columns].iloc[:min(len(results_df), search_range)].set_index('name')
     results_df.index.name = None
     results_df = results_df.to_html(escape=False)
     results_df = results_df.replace('<th></th>', '<th>name</th>').replace('<tr style="text-align: right;">',
                                                                           '<tr style="text-align: left;">').replace(
-        'pos_rating_pct', 'average rating /100')
+        'pos_rating_pct', 'sentiment score').replace(
+        'review', 'user review')
 
     st.write(results_df, unsafe_allow_html=True)
 
@@ -80,13 +85,15 @@ def generate_game_info(game_title):
         if output_columns[x] != 'pos_rating_pct':
             info_columns[x + 1].write(f'{output_columns[x]}'.title())
         else:
-            info_columns[x + 1].write('Average Rating /100')
+            info_columns[x + 1].write('Sentiment Score')
 
         if output_columns[x] == 'name':
             info_columns[x + 1].write(
                 f'[{games.loc[search_key_values, output_columns[x]].values[0]}](https://store.steampowered.com/app/{search_keys.loc[game_title.lower()].values[0]})')
         elif output_columns[x] == 'price':
             info_columns[x + 1].write(f'${games.loc[search_key_values, output_columns[x]].values[0]}')
+        elif output_columns[x] == 'review':
+            info_columns[x + 1].write(f'{games.loc[search_key_values, output_columns[x]].values[0]}')
         elif output_columns[x] == 'pos_rating_pct':
             info_columns[x + 1].write(f'{int(games.loc[search_key_values, output_columns[x]].values[0] * 100)}')
         else:
